@@ -6,6 +6,7 @@ import { ModelSidebar } from "./components/ModelSidebar";
 import { SpectrogramView } from "./components/SpectrogramView";
 import { PlayerControls } from "./components/PlayerControls";
 import { StemResults, type StemData } from "./components/StemResults";
+import { DjaiFxPanel } from "./components/DjaiFxPanel";
 import {
   ModelProgress,
   reduceProgress,
@@ -283,9 +284,9 @@ export default function App() {
         ? progress.chunk.index + (progress.done ? 1 : 0)
         : 0;
       const pct = Math.round((done / total) * 100);
-      document.title = `(${pct}%) Separating — Demucs`;
+      document.title = `(${pct}%) Séparation — DJAI`;
     } else {
-      document.title = "Demucs";
+      document.title = "DJAI";
     }
   }, [phase.kind, progress]);
 
@@ -304,7 +305,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1 className="logo">Demucs</h1>
+        <h1 className="logo">DJAI</h1>
         <span className="tagline">{tagline}</span>
         {hasTrack && (
           <button
@@ -363,11 +364,14 @@ export default function App() {
               )}
 
               {phase.kind === "separated" && (
-                <StemResults
-                  stems={phase.stems}
-                  player={multiPlayer}
-                  sampleRate={trackInfo.sampleRate}
-                />
+                <>
+                  <StemResults
+                    stems={phase.stems}
+                    player={multiPlayer}
+                    sampleRate={trackInfo.sampleRate}
+                  />
+                  <DjaiFxPanel player={multiPlayer} />
+                </>
               )}
             </div>
             <ModelSidebar

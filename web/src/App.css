@@ -1021,6 +1021,117 @@ body {
   height: 100px;
 }
 
+.stem-row__dose {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.stem-row__dose-slider {
+  flex: 1;
+  min-width: 0;
+  height: 3px;
+  cursor: pointer;
+}
+
+.stem-row__dose-value {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-micro);
+  width: 30px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DJAI Master FX Panel (vocal reduction + 3-band kill EQ)
+   ══════════════════════════════════════════════════════════════ */
+
+.djai-fx {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  margin-top: 12px;
+}
+
+.djai-fx__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.djai-fx__title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text);
+}
+
+.djai-fx__hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-micro);
+}
+
+.djai-fx__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.djai-fx__row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.djai-fx__row-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  width: 40px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.djai-fx__bands {
+  display: flex;
+  gap: 16px;
+}
+
+.djai-fx__band {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.djai-fx__band-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.djai-fx__band input[type="range"] {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 20px;
+  height: 80px;
+}
+
+.djai-fx__band-value {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-micro);
+}
+
 /* ══════════════════════════════════════════════════════════════
    Clip Selection Overlay
    ══════════════════════════════════════════════════════════════ */
