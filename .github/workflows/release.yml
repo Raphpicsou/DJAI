@@ -47,7 +47,7 @@ jobs:
         working-directory: web
         run: |
           pnpm install
-          pnpm exec vite build --base=/demucs-rs/
+          pnpm exec vite build --base=/DJAI/
 
       - name: Upload web artifact
         uses: actions/upload-pages-artifact@v3
