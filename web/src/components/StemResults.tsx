@@ -52,6 +52,7 @@ function StemRow({
 }) {
   const isMuted = player.muted[stem.name] ?? false;
   const isSolo = player.solo === stem.name;
+  const level = player.levels[stem.name] ?? 1;
   const color = STEM_COLORS[stem.name] ?? "var(--text)";
 
   const handleDownload = () => {
@@ -95,6 +96,20 @@ function StemRow({
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
           </button>
+        </div>
+        <div className="stem-row__dose">
+          <input
+            type="range"
+            className="stem-row__dose-slider"
+            min={0}
+            max={150}
+            step={1}
+            value={Math.round(level * 100)}
+            style={{ accentColor: color }}
+            onChange={(e) => player.setLevel(stem.name, Number(e.target.value) / 100)}
+            aria-label={`Dosage ${stem.name}`}
+          />
+          <span className="stem-row__dose-value">{Math.round(level * 100)}%</span>
         </div>
       </div>
       <div className="stem-row__spectrogram">
