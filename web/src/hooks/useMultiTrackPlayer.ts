@@ -15,6 +15,9 @@ export interface BandGains {
 
 export const DEFAULT_BAND_GAINS: BandGains = { low: 0, mid: 0, high: 0 };
 
+export const MIN_TEMPO = 0.5;
+export const MAX_TEMPO = 1.5;
+
 export interface MultiTrackPlayer {
   isPlaying: boolean;
   currentTime: number;
@@ -24,12 +27,14 @@ export interface MultiTrackPlayer {
   levels: Record<string, number>; // 0..1.5, continuous blend per stem
   vocalReduction: number; // 0..1 — master-bus phase-cancellation vocal reduction
   bandGains: BandGains; // master-bus 3-band kill EQ, in dB
+  tempo: number; // 0.5..1.5 — playback speed multiplier (vinyl-style: pitch follows speed)
   toggleAll: () => void;
   playSolo: (name: string) => void;
   toggleMute: (name: string) => void;
   setLevel: (name: string, level: number) => void;
   setVocalReduction: (amount: number) => void;
   setBandGain: (band: keyof BandGains, dB: number) => void;
+  setTempo: (rate: number) => void;
   seek: (time: number) => void;
 }
 
@@ -47,6 +52,22 @@ export function computeStemGain(
   const level = levels[name] ?? 1;
   const audible = solo !== null ? name === solo : !(muted[name] ?? false);
   return audible ? level : 0;
+}
+
+/**
+ * Pure helper: current position in track-time, accounting for a playback
+ * rate that may differ from 1x. Real elapsed wall-clock time is scaled by
+ * `rate` to get elapsed track-time — e.g. at 1.5x, 2 real seconds advance
+ * the track by 3 seconds. Extracted as a pure function so it is
+ * unit-testable without a real AudioContext.
+ */
+export function computeTrackPosition(
+  offset: number,
+  ctxCurrentTime: number,
+  startedAt: number,
+  rate: number,
+): number {
+  return offset + (ctxCurrentTime - startedAt) * rate;
 }
 
 /**
@@ -96,6 +117,7 @@ export function useMultiTrackPlayer(
   const startedAtRef = useRef(0);
   const offsetRef = useRef(0);
   const playingRef = useRef(false);
+  const rateRef = useRef(1);
 
   const rafRef = useRef(0);
 
@@ -113,6 +135,7 @@ export function useMultiTrackPlayer(
   const [levels, setLevels] = useState<Record<string, number>>({});
   const [vocalReduction, setVocalReductionState] = useState(0);
   const [bandGains, setBandGainsState] = useState<BandGains>(DEFAULT_BAND_GAINS);
+  const [tempo, setTempoState] = useState(1);
 
   /** Build the shared master FX chain once. Safe to call multiple times. */
   const ensureMasterChain = useCallback((ctx: AudioContext) => {
@@ -228,6 +251,7 @@ export function useMultiTrackPlayer(
       for (const [name, buffer] of buffersRef.current) {
         const source = ctx.createBufferSource();
         source.buffer = buffer;
+        source.playbackRate.value = rateRef.current;
         source.connect(gainsRef.current.get(name)!);
         source.start(0, offset);
         sourcesRef.current.set(name, source);
@@ -262,6 +286,7 @@ export function useMultiTrackPlayer(
     playingRef.current = false;
     offsetRef.current = 0;
     startedAtRef.current = 0;
+    rateRef.current = 1;
     mutedRef.current = {};
     soloRef.current = null;
     levelsRef.current = {};
@@ -272,6 +297,7 @@ export function useMultiTrackPlayer(
     setMuted({});
     setSolo(null);
     setLevels({});
+    setTempoState(1);
 
     if (!tracks || tracks.length === 0) return;
 
@@ -329,8 +355,12 @@ export function useMultiTrackPlayer(
     const tick = () => {
       const ctx = ctxRef.current;
       if (ctx && playingRef.current) {
-        const t =
-          offsetRef.current + (ctx.currentTime - startedAtRef.current);
+        const t = computeTrackPosition(
+          offsetRef.current,
+          ctx.currentTime,
+          startedAtRef.current,
+          rateRef.current,
+        );
         setCurrentTime(t);
       }
       rafRef.current = requestAnimationFrame(tick);
@@ -347,8 +377,13 @@ export function useMultiTrackPlayer(
     if (ctx.state === "suspended") ctx.resume();
 
     if (playingRef.current) {
-      const elapsed = ctx.currentTime - startedAtRef.current;
-      offsetRef.current = offsetRef.current + elapsed;
+      const pos = computeTrackPosition(
+        offsetRef.current,
+        ctx.currentTime,
+        startedAtRef.current,
+        rateRef.current,
+      );
+      offsetRef.current = pos;
       stopSources();
       playingRef.current = false;
       setIsPlaying(false);
@@ -441,6 +476,35 @@ export function useMultiTrackPlayer(
     if (filter) filter.gain.value = dB;
   }, []);
 
+  /**
+   * Playback speed, vinyl-style: pitch follows speed, exactly like a
+   * turntable's pitch fader. Freezes the current position under the old
+   * rate, then resumes from there under the new rate — sources stay
+   * perfectly synced since every stem gets the same rate at the same time.
+   */
+  const setTempo = useCallback((rate: number) => {
+    const ctx = ctxRef.current;
+    const clamped = Math.max(MIN_TEMPO, Math.min(MAX_TEMPO, rate));
+
+    if (ctx && playingRef.current) {
+      const pos = computeTrackPosition(
+        offsetRef.current,
+        ctx.currentTime,
+        startedAtRef.current,
+        rateRef.current,
+      );
+      offsetRef.current = pos;
+      startedAtRef.current = ctx.currentTime;
+    }
+
+    rateRef.current = clamped;
+    setTempoState(clamped);
+
+    for (const src of sourcesRef.current.values()) {
+      src.playbackRate.value = clamped;
+    }
+  }, []);
+
   const seek = useCallback(
     (time: number) => {
       if (playingRef.current) {
@@ -463,12 +527,14 @@ export function useMultiTrackPlayer(
     levels,
     vocalReduction,
     bandGains,
+    tempo,
     toggleAll,
     playSolo,
     toggleMute,
     setLevel,
     setVocalReduction,
     setBandGain,
+    setTempo,
     seek,
   };
 }
