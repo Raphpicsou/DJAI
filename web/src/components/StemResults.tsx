@@ -25,9 +25,34 @@ interface Props {
 export function StemResults({ stems, player, sampleRate }: Props) {
   return (
     <div className="stem-results">
-      <button className="stem-results__play-all" onClick={player.toggleAll}>
-        {player.isPlaying ? "Pause All" : "Play All"}
-      </button>
+      <div className="stem-results__transport">
+        <button className="stem-results__play-all" onClick={player.toggleAll}>
+          {player.isPlaying ? "Pause All" : "Play All"}
+        </button>
+
+        <div className="stem-results__tempo">
+          <span className="stem-results__tempo-label">Tempo</span>
+          <input
+            type="range"
+            min={50}
+            max={150}
+            step={1}
+            value={Math.round(player.tempo * 100)}
+            onChange={(e) => player.setTempo(Number(e.target.value) / 100)}
+            aria-label="Tempo"
+          />
+          <span className="stem-results__tempo-value">
+            {Math.round(player.tempo * 100)}%
+          </span>
+          <button
+            className="stem-results__tempo-reset"
+            onClick={() => player.setTempo(1)}
+            title="Réinitialiser à 100%"
+          >
+            ↺
+          </button>
+        </div>
+      </div>
 
       {stems.map((stem) => (
         <StemRow
