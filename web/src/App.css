@@ -926,6 +926,53 @@ body {
   transform: scale(1.03);
 }
 
+.stem-results__transport {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.stem-results__tempo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stem-results__tempo-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.stem-results__tempo input[type="range"] {
+  width: 120px;
+}
+
+.stem-results__tempo-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+  width: 38px;
+}
+
+.stem-results__tempo-reset {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-dim);
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stem-results__tempo-reset:hover {
+  color: var(--text);
+  border-color: var(--accent-cool);
+}
+
 .stem-row {
   display: flex;
   flex-direction: row;
