@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SoundTouchNode } from "@soundtouchjs/audio-worklet";
+import soundTouchProcessorUrl from "@soundtouchjs/audio-worklet/processor?url";
 
 export interface StemTrack {
   name: string;
@@ -98,6 +100,8 @@ export function useMultiTrackPlayer(
   const buffersRef = useRef<Map<string, AudioBuffer>>(new Map());
   const gainsRef = useRef<Map<string, GainNode>>(new Map());
   const sourcesRef = useRef<Map<string, AudioBufferSourceNode>>(new Map());
+  const soundTouchNodesRef = useRef<Map<string, SoundTouchNode>>(new Map());
+  const soundTouchRegisteredRef = useRef(false);
 
   // Web Audio API refs — shared master FX chain (built once per AudioContext)
   const masterInputRef = useRef<GainNode | null>(null);
@@ -215,6 +219,22 @@ export function useMultiTrackPlayer(
     highFilterRef.current = highFilter;
   }, []);
 
+  /** Registers the SoundTouch AudioWorklet processor once per AudioContext. */
+  const ensureSoundTouch = useCallback(async (ctx: AudioContext) => {
+    if (soundTouchRegisteredRef.current) return true;
+    try {
+      await SoundTouchNode.register(ctx, soundTouchProcessorUrl);
+      soundTouchRegisteredRef.current = true;
+      return true;
+    } catch (err) {
+      console.warn(
+        "SoundTouch AudioWorklet unavailable — falling back to vinyl-style tempo (pitch will shift).",
+        err,
+      );
+      return false;
+    }
+  }, []);
+
   /** Apply mute/solo/level by setting gain values. Instant, glitch-free. */
   const syncGains = useCallback(() => {
     for (const [name, gain] of gainsRef.current) {
@@ -252,7 +272,17 @@ export function useMultiTrackPlayer(
         const source = ctx.createBufferSource();
         source.buffer = buffer;
         source.playbackRate.value = rateRef.current;
-        source.connect(gainsRef.current.get(name)!);
+
+        const stNode = soundTouchNodesRef.current.get(name);
+        if (stNode) {
+          stNode.playbackRate.value = rateRef.current;
+          source.connect(stNode);
+        } else {
+          // SoundTouch unavailable on this browser: connect straight to the
+          // gain node — tempo still works via native playbackRate, it just
+          // shifts pitch too (vinyl-style), same as before this feature.
+          source.connect(gainsRef.current.get(name)!);
+        }
         source.start(0, offset);
         sourcesRef.current.set(name, source);
       }
@@ -282,6 +312,8 @@ export function useMultiTrackPlayer(
     buffersRef.current.clear();
     for (const gain of gainsRef.current.values()) gain.disconnect();
     gainsRef.current.clear();
+    for (const stNode of soundTouchNodesRef.current.values()) stNode.disconnect();
+    soundTouchNodesRef.current.clear();
 
     playingRef.current = false;
     offsetRef.current = 0;
@@ -310,6 +342,9 @@ export function useMultiTrackPlayer(
     let cancelled = false;
 
     (async () => {
+      const soundTouchOk = await ensureSoundTouch(ctx);
+      if (cancelled) return;
+
       const initialMuted: Record<string, boolean> = {};
       const initialLevels: Record<string, number> = {};
 
@@ -328,6 +363,12 @@ export function useMultiTrackPlayer(
         const gain = ctx.createGain();
         gain.connect(masterInputRef.current!);
         gainsRef.current.set(name, gain);
+
+        if (soundTouchOk) {
+          const stNode = new SoundTouchNode({ context: ctx });
+          stNode.connect(gain);
+          soundTouchNodesRef.current.set(name, stNode);
+        }
 
         initialMuted[name] = false;
         initialLevels[name] = 1;
@@ -500,8 +541,10 @@ export function useMultiTrackPlayer(
     rateRef.current = clamped;
     setTempoState(clamped);
 
-    for (const src of sourcesRef.current.values()) {
+    for (const [name, src] of sourcesRef.current) {
       src.playbackRate.value = clamped;
+      const stNode = soundTouchNodesRef.current.get(name);
+      if (stNode) stNode.playbackRate.value = clamped;
     }
   }, []);
 
