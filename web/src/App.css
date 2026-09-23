@@ -937,12 +937,29 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.stem-results__tempo--active {
+  border-color: var(--accent-cool);
+  background: var(--surface);
 }
 
 .stem-results__tempo-label {
+  display: flex;
+  flex-direction: column;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-dim);
+  line-height: 1.3;
+}
+
+.stem-results__tempo-hint {
+  font-size: 9px;
+  color: var(--text-micro);
 }
 
 .stem-results__tempo input[type="range"] {
@@ -1059,6 +1076,23 @@ body {
   color: #6ee7a0;
 }
 
+.stem-row__style {
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text-micro);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.stem-row__style--active {
+  border-color: var(--accent-cool);
+  color: var(--text);
+}
+
 .stem-row__spectrogram {
   flex: 1;
   min-width: 0;
@@ -1125,6 +1159,23 @@ body {
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--text-micro);
+}
+
+.djai-fx__style-select {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-family: var(--font-body);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.djai-fx__style-select--active {
+  border-color: var(--accent-cool);
+  color: var(--text);
 }
 
 .djai-fx__row {
