@@ -1,5 +1,6 @@
 import { SpectrogramView } from "./SpectrogramView";
 import type { MultiTrackPlayer } from "../hooks/useMultiTrackPlayer";
+import { STYLE_IDS, STYLE_LABELS } from "../audio/styleProcessor";
 
 export interface StemData {
   name: string;
@@ -30,8 +31,13 @@ export function StemResults({ stems, player, sampleRate }: Props) {
           {player.isPlaying ? "Pause All" : "Play All"}
         </button>
 
-        <div className="stem-results__tempo">
-          <span className="stem-results__tempo-label">Tempo</span>
+        <div
+          className={`stem-results__tempo ${player.stretchMode === "tempo" ? "stem-results__tempo--active" : ""}`}
+        >
+          <span className="stem-results__tempo-label">
+            Tempo
+            <span className="stem-results__tempo-hint">hauteur change</span>
+          </span>
           <input
             type="range"
             min={50}
@@ -47,6 +53,34 @@ export function StemResults({ stems, player, sampleRate }: Props) {
           <button
             className="stem-results__tempo-reset"
             onClick={() => player.setTempo(1)}
+            title="Réinitialiser à 100%"
+          >
+            ↺
+          </button>
+        </div>
+
+        <div
+          className={`stem-results__tempo ${player.stretchMode === "timestretch" ? "stem-results__tempo--active" : ""}`}
+        >
+          <span className="stem-results__tempo-label">
+            Time Stretch
+            <span className="stem-results__tempo-hint">hauteur préservée</span>
+          </span>
+          <input
+            type="range"
+            min={50}
+            max={150}
+            step={1}
+            value={Math.round(player.timeStretch * 100)}
+            onChange={(e) => player.setTimeStretch(Number(e.target.value) / 100)}
+            aria-label="Time Stretch"
+          />
+          <span className="stem-results__tempo-value">
+            {Math.round(player.timeStretch * 100)}%
+          </span>
+          <button
+            className="stem-results__tempo-reset"
+            onClick={() => player.setTimeStretch(1)}
             title="Réinitialiser à 100%"
           >
             ↺
@@ -78,6 +112,7 @@ function StemRow({
   const isMuted = player.muted[stem.name] ?? false;
   const isSolo = player.solo === stem.name;
   const level = player.levels[stem.name] ?? 1;
+  const style = player.styles[stem.name] ?? "none";
   const color = STEM_COLORS[stem.name] ?? "var(--text)";
 
   const handleDownload = () => {
@@ -121,6 +156,18 @@ function StemRow({
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
           </button>
+          <select
+            className={`stem-row__style ${style !== "none" ? "stem-row__style--active" : ""}`}
+            value={style}
+            onChange={(e) => player.setStyle(stem.name, e.target.value as typeof style)}
+            aria-label={`Style ${stem.name}`}
+          >
+            {STYLE_IDS.map((id) => (
+              <option key={id} value={id}>
+                {STYLE_LABELS[id]}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="stem-row__dose">
           <input

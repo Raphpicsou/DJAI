@@ -1,5 +1,6 @@
 import type { MultiTrackPlayer } from "../hooks/useMultiTrackPlayer";
 import type { BandGains } from "../hooks/useMultiTrackPlayer";
+import { STYLE_IDS, STYLE_LABELS } from "../audio/styleProcessor";
 
 interface Props {
   player: MultiTrackPlayer;
@@ -36,6 +37,23 @@ export function DjaiFxPanel({ player }: Props) {
 
   return (
     <div className="djai-fx">
+      <div className="djai-fx__section">
+        <span className="djai-fx__title">Style — morceau entier</span>
+        <span className="djai-fx__hint">Effets DSP, pas de l'IA générative</span>
+        <select
+          className={`djai-fx__style-select ${player.masterStyle !== "none" ? "djai-fx__style-select--active" : ""}`}
+          value={player.masterStyle}
+          onChange={(e) => player.setMasterStyle(e.target.value as typeof player.masterStyle)}
+          aria-label="Style du morceau entier"
+        >
+          {STYLE_IDS.map((id) => (
+            <option key={id} value={id}>
+              {STYLE_LABELS[id]}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div className="djai-fx__section">
         <span className="djai-fx__title">Réduction voix</span>
         <span className="djai-fx__hint">Annulation de phase (L−R)</span>
