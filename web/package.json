@@ -12,6 +12,8 @@
     "e2e:setup": "curl -fSL -o e2e/fixtures/test-audio.mp3 https://freemusicarchive.org/track/there-aint-nothin/stream/ && npx playwright install chromium"
   },
   "dependencies": {
+    "@soundtouchjs/audio-worklet": "^2.1.1",
+    "@soundtouchjs/core": "^2.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -24,6 +26,8 @@
     "vite": "^6.0.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }
