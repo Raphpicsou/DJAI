@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SoundTouchNode } from "@soundtouchjs/audio-worklet";
 import soundTouchProcessorUrl from "@soundtouchjs/audio-worklet/processor?url";
+import {
+  createStyleChain,
+  getStylePreset,
+  type StyleChain,
+  type StyleId,
+} from "../audio/styleProcessor";
+export type { StyleId } from "../audio/styleProcessor";
 
 export interface StemTrack {
   name: string;
@@ -20,6 +27,8 @@ export const DEFAULT_BAND_GAINS: BandGains = { low: 0, mid: 0, high: 0 };
 export const MIN_TEMPO = 0.5;
 export const MAX_TEMPO = 1.5;
 
+export type StretchMode = "tempo" | "timestretch";
+
 export interface MultiTrackPlayer {
   isPlaying: boolean;
   currentTime: number;
@@ -29,7 +38,11 @@ export interface MultiTrackPlayer {
   levels: Record<string, number>; // 0..1.5, continuous blend per stem
   vocalReduction: number; // 0..1 — master-bus phase-cancellation vocal reduction
   bandGains: BandGains; // master-bus 3-band kill EQ, in dB
-  tempo: number; // 0.5..1.5 — playback speed multiplier (vinyl-style: pitch follows speed)
+  tempo: number; // 0.5..1.5 — vinyl-style speed (pitch follows speed)
+  timeStretch: number; // 0.5..1.5 — true time-stretch (pitch stays the same)
+  stretchMode: StretchMode; // which of the two is currently driving playback
+  styles: Record<string, StyleId>; // per-stem genre-style DSP preset
+  masterStyle: StyleId; // whole-mix genre-style DSP preset, on the master bus
   toggleAll: () => void;
   playSolo: (name: string) => void;
   toggleMute: (name: string) => void;
@@ -37,6 +50,9 @@ export interface MultiTrackPlayer {
   setVocalReduction: (amount: number) => void;
   setBandGain: (band: keyof BandGains, dB: number) => void;
   setTempo: (rate: number) => void;
+  setTimeStretch: (rate: number) => void;
+  setStyle: (name: string, style: StyleId) => void;
+  setMasterStyle: (style: StyleId) => void;
   seek: (time: number) => void;
 }
 
@@ -102,6 +118,8 @@ export function useMultiTrackPlayer(
   const sourcesRef = useRef<Map<string, AudioBufferSourceNode>>(new Map());
   const soundTouchNodesRef = useRef<Map<string, SoundTouchNode>>(new Map());
   const soundTouchRegisteredRef = useRef(false);
+  const styleChainsRef = useRef<Map<string, StyleChain>>(new Map());
+  const masterStyleChainRef = useRef<StyleChain | null>(null);
 
   // Web Audio API refs — shared master FX chain (built once per AudioContext)
   const masterInputRef = useRef<GainNode | null>(null);
@@ -122,6 +140,7 @@ export function useMultiTrackPlayer(
   const offsetRef = useRef(0);
   const playingRef = useRef(false);
   const rateRef = useRef(1);
+  const modeRef = useRef<StretchMode>("tempo");
 
   const rafRef = useRef(0);
 
@@ -140,6 +159,10 @@ export function useMultiTrackPlayer(
   const [vocalReduction, setVocalReductionState] = useState(0);
   const [bandGains, setBandGainsState] = useState<BandGains>(DEFAULT_BAND_GAINS);
   const [tempo, setTempoState] = useState(1);
+  const [timeStretch, setTimeStretchState] = useState(1);
+  const [stretchMode, setStretchModeState] = useState<StretchMode>("tempo");
+  const [styles, setStyles] = useState<Record<string, StyleId>>({});
+  const [masterStyle, setMasterStyleState] = useState<StyleId>("none");
 
   /** Build the shared master FX chain once. Safe to call multiple times. */
   const ensureMasterChain = useCallback((ctx: AudioContext) => {
@@ -203,7 +226,11 @@ export function useMultiTrackPlayer(
     merger.connect(lowFilter);
     lowFilter.connect(midFilter);
     midFilter.connect(highFilter);
-    highFilter.connect(ctx.destination);
+
+    const masterStyleChain = createStyleChain(ctx);
+    highFilter.connect(masterStyleChain.input);
+    masterStyleChain.output.connect(ctx.destination);
+    masterStyleChainRef.current = masterStyleChain;
 
     masterInputRef.current = masterInput;
     splitterRef.current = splitter;
@@ -274,13 +301,18 @@ export function useMultiTrackPlayer(
         source.playbackRate.value = rateRef.current;
 
         const stNode = soundTouchNodesRef.current.get(name);
-        if (stNode) {
+        const styleChain = styleChainsRef.current.get(name);
+        if (modeRef.current === "timestretch" && stNode) {
+          // True time-stretch: route through SoundTouch (which compensates
+          // pitch for the mirrored playback rate), then into the style chain.
           stNode.playbackRate.value = rateRef.current;
           source.connect(stNode);
+        } else if (styleChain) {
+          // Vinyl-style tempo (or SoundTouch unavailable as a fallback):
+          // straight to the style chain, native playbackRate only — pitch
+          // follows speed, same as a turntable's pitch fader.
+          source.connect(styleChain.input);
         } else {
-          // SoundTouch unavailable on this browser: connect straight to the
-          // gain node — tempo still works via native playbackRate, it just
-          // shifts pitch too (vinyl-style), same as before this feature.
           source.connect(gainsRef.current.get(name)!);
         }
         source.start(0, offset);
@@ -314,11 +346,14 @@ export function useMultiTrackPlayer(
     gainsRef.current.clear();
     for (const stNode of soundTouchNodesRef.current.values()) stNode.disconnect();
     soundTouchNodesRef.current.clear();
+    for (const chain of styleChainsRef.current.values()) chain.dispose();
+    styleChainsRef.current.clear();
 
     playingRef.current = false;
     offsetRef.current = 0;
     startedAtRef.current = 0;
     rateRef.current = 1;
+    modeRef.current = "tempo";
     mutedRef.current = {};
     soloRef.current = null;
     levelsRef.current = {};
@@ -330,6 +365,9 @@ export function useMultiTrackPlayer(
     setSolo(null);
     setLevels({});
     setTempoState(1);
+    setTimeStretchState(1);
+    setStretchModeState("tempo");
+    setStyles({});
 
     if (!tracks || tracks.length === 0) return;
 
@@ -364,9 +402,13 @@ export function useMultiTrackPlayer(
         gain.connect(masterInputRef.current!);
         gainsRef.current.set(name, gain);
 
+        const styleChain = createStyleChain(ctx);
+        styleChain.output.connect(gain);
+        styleChainsRef.current.set(name, styleChain);
+
         if (soundTouchOk) {
           const stNode = new SoundTouchNode({ context: ctx });
-          stNode.connect(gain);
+          stNode.connect(styleChain.input);
           soundTouchNodesRef.current.set(name, stNode);
         }
 
@@ -517,36 +559,69 @@ export function useMultiTrackPlayer(
     if (filter) filter.gain.value = dB;
   }, []);
 
-  /**
-   * Playback speed, vinyl-style: pitch follows speed, exactly like a
-   * turntable's pitch fader. Freezes the current position under the old
-   * rate, then resumes from there under the new rate — sources stay
-   * perfectly synced since every stem gets the same rate at the same time.
-   */
-  const setTempo = useCallback((rate: number) => {
-    const ctx = ctxRef.current;
-    const clamped = Math.max(MIN_TEMPO, Math.min(MAX_TEMPO, rate));
-
-    if (ctx && playingRef.current) {
-      const pos = computeTrackPosition(
-        offsetRef.current,
-        ctx.currentTime,
-        startedAtRef.current,
-        rateRef.current,
-      );
-      offsetRef.current = pos;
-      startedAtRef.current = ctx.currentTime;
-    }
-
-    rateRef.current = clamped;
-    setTempoState(clamped);
-
-    for (const [name, src] of sourcesRef.current) {
-      src.playbackRate.value = clamped;
-      const stNode = soundTouchNodesRef.current.get(name);
-      if (stNode) stNode.playbackRate.value = clamped;
-    }
+  /** Applies a genre-style DSP preset to one stem, in place — no reconnection. */
+  const setStyle = useCallback((name: string, style: StyleId) => {
+    setStyles((prev) => ({ ...prev, [name]: style }));
+    styleChainsRef.current.get(name)?.setPreset(getStylePreset(style));
   }, []);
+
+  /** Applies a genre-style DSP preset to the whole mix (master bus). */
+  const setMasterStyle = useCallback((style: StyleId) => {
+    setMasterStyleState(style);
+    masterStyleChainRef.current?.setPreset(getStylePreset(style));
+  }, []);
+
+  /**
+   * Shared logic for both stretch modes: freezes the current position under
+   * the old rate/mode, switches to the new rate/mode, then re-routes every
+   * active source accordingly. Sources stay perfectly synced since every
+   * stem gets the same rate and routing at the same instant.
+   */
+  const applyStretch = useCallback(
+    (mode: StretchMode, rate: number) => {
+      const ctx = ctxRef.current;
+      const clamped = Math.max(MIN_TEMPO, Math.min(MAX_TEMPO, rate));
+
+      if (ctx && playingRef.current) {
+        const pos = computeTrackPosition(
+          offsetRef.current,
+          ctx.currentTime,
+          startedAtRef.current,
+          rateRef.current,
+        );
+        offsetRef.current = pos;
+        startedAtRef.current = ctx.currentTime;
+      }
+
+      rateRef.current = clamped;
+      modeRef.current = mode;
+
+      if (mode === "tempo") setTempoState(clamped);
+      else setTimeStretchState(clamped);
+      setStretchModeState(mode);
+
+      // Re-route every currently playing source to match the new mode —
+      // this is the same "freeze and restart" trick used elsewhere, since
+      // switching between direct-to-gain and through-SoundTouch requires
+      // reconnecting the graph, not just tweaking a value.
+      if (playingRef.current) {
+        startSources(offsetRef.current);
+      }
+    },
+    [startSources],
+  );
+
+  /** Vinyl-style speed: pitch follows speed, exactly like a turntable's pitch fader. */
+  const setTempo = useCallback(
+    (rate: number) => applyStretch("tempo", rate),
+    [applyStretch],
+  );
+
+  /** True time-stretch: speed changes, pitch stays exactly as recorded. */
+  const setTimeStretch = useCallback(
+    (rate: number) => applyStretch("timestretch", rate),
+    [applyStretch],
+  );
 
   const seek = useCallback(
     (time: number) => {
@@ -571,6 +646,10 @@ export function useMultiTrackPlayer(
     vocalReduction,
     bandGains,
     tempo,
+    timeStretch,
+    stretchMode,
+    styles,
+    masterStyle,
     toggleAll,
     playSolo,
     toggleMute,
@@ -578,6 +657,9 @@ export function useMultiTrackPlayer(
     setVocalReduction,
     setBandGain,
     setTempo,
+    setTimeStretch,
+    setStyle,
+    setMasterStyle,
     seek,
   };
 }
