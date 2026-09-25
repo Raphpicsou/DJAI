@@ -414,7 +414,7 @@ body {
 .spectrogram-wrap {
   position: relative;
   flex: none;
-  height: 140px;
+  height: 70px;
   border-radius: 14px;
   overflow: hidden;
   background: #000;
@@ -511,6 +511,32 @@ body {
   height: 18px;
 }
 
+.loop-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.loop-btn:hover {
+  color: var(--text);
+  border-color: var(--accent-cool);
+}
+
+.loop-btn--active {
+  background: linear-gradient(135deg, var(--accent-cool), var(--accent));
+  border-color: transparent;
+  color: #fff;
+}
+
 .track-info {
   flex: 1;
   min-width: 0;
@@ -569,121 +595,69 @@ body {
 .model-sidebar__cards {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 2px;
 }
 
 .model-sidebar__stems {
   animation: stem-fade-in 0.3s ease;
 }
 
-/* ── Model Card ─── */
-.model-card {
-  position: relative;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
+/* ── Model option (compact text row, replaces the old big cards) ─── */
+.model-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
   cursor: pointer;
   text-align: left;
-  font-family: inherit;
-  color: var(--text);
-  padding: 0;
-  transition: transform 0.2s ease, border-color 0.2s ease;
-}
-
-.model-card:hover {
-  transform: translateY(-2px);
-}
-
-.model-card__inner {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 20px;
-  border-radius: calc(var(--radius) - 1px);
-  background: var(--surface);
-  height: 100%;
-}
-
-/* Selected card: static gradient border */
-.model-card--selected {
-  border-color: transparent;
-  background: transparent;
-}
-
-.model-card--selected::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: calc(var(--radius) + 2px);
-  background: linear-gradient(135deg, var(--accent-cool), var(--accent));
-  z-index: 0;
-}
-
-/* Solid fill that masks the gradient inside the card */
-.model-card--selected::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: calc(var(--radius) - 1px);
-  background: var(--surface);
-  z-index: 0;
-}
-
-/* Unselected cached card: subtle glow */
-.model-card--cached {
-  border-color: rgba(124, 111, 240, 0.25);
-}
-
-.model-card__label {
-  font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.model-card__desc {
-  font-size: 13px;
+  font-family: var(--font-body);
   color: var(--text-dim);
-  line-height: 1.4;
+  padding: 5px 8px;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.model-card__size {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--text-micro);
+.model-option:hover {
+  background: var(--surface);
+  color: var(--text);
 }
 
-.model-card__status {
-  margin-top: auto;
-  padding-top: 4px;
-  min-height: 20px;
-}
-
-.model-card__hint {
-  font-size: 12px;
-  color: var(--text-micro);
-}
-
-.model-card__cached {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
+.model-option--selected {
+  background: var(--surface);
+  color: var(--text);
   font-weight: 600;
-  color: #6ee7a0;
-  background: rgba(110, 231, 160, 0.08);
-  padding: 3px 10px 3px 7px;
-  border-radius: 20px;
-  border: 1px solid rgba(110, 231, 160, 0.2);
 }
 
-.model-card__check {
+.model-option--selected .model-option__label::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-cool), var(--accent));
+  margin-right: 7px;
+}
+
+.model-option__label {
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+}
+
+.model-option__meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-micro);
   flex-shrink: 0;
 }
 
-.model-card__error {
-  font-size: 12px;
+.model-option__meta--ready {
+  color: #6ee7a0;
+}
+
+.model-option__meta--error {
   color: var(--accent);
 }
 
@@ -1105,7 +1079,7 @@ body {
 }
 
 .stem-row__spectrogram .spectrogram-wrap {
-  height: 100px;
+  height: 50px;
 }
 
 .stem-row__dose {

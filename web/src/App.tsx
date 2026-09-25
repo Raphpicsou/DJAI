@@ -233,6 +233,16 @@ export default function App() {
         (window as any).__e2e = { stems: tracks, originalLeft: left, originalRight: right };
       }
 
+      // Fixed display order: vocals first, then other, bass, drums, then
+      // anything else (guitar/piano for the 6-stem model) at the end.
+      const STEM_DISPLAY_ORDER = ["vocals", "other", "bass", "drums"];
+      const orderIndex = (name: string) => {
+        const idx = STEM_DISPLAY_ORDER.indexOf(name);
+        return idx === -1 ? STEM_DISPLAY_ORDER.length : idx;
+      };
+      stems.sort((a, b) => orderIndex(a.name) - orderIndex(b.name));
+      tracks.sort((a, b) => orderIndex(a.name) - orderIndex(b.name));
+
       setPhase({ kind: "separated", stems, tracks });
     } catch (err) {
       console.error("Separation failed:", err);
@@ -356,7 +366,9 @@ export default function App() {
                 isPlaying={phase.kind === "separated" ? multiPlayer.isPlaying : player.isPlaying}
                 currentTime={phase.kind === "separated" ? multiPlayer.currentTime : player.currentTime}
                 duration={phase.kind === "separated" ? multiPlayer.duration : player.duration}
+                loop={phase.kind === "separated" ? multiPlayer.loop : player.loop}
                 onToggle={phase.kind === "separated" ? multiPlayer.toggleAll : player.toggle}
+                onToggleLoop={phase.kind === "separated" ? multiPlayer.toggleLoop : player.toggleLoop}
               />
 
               {phase.kind === "separating" && (
