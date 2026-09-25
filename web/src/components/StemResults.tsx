@@ -110,7 +110,7 @@ function StemRow({
   sampleRate: number;
 }) {
   const isMuted = player.muted[stem.name] ?? false;
-  const isSolo = player.solo === stem.name;
+  const isSolo = player.solo.has(stem.name);
   const level = player.levels[stem.name] ?? 1;
   const style = player.styles[stem.name] ?? "none";
   const color = STEM_COLORS[stem.name] ?? "var(--text)";

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { getModels, type ModelVariant, type StemId, type SelectedModel } from "../models/registry";
 import { useModelDownload, type DownloadState } from "../models/useModelDownload";
-import { ProgressBar } from "./ProgressBar";
 import { formatTime as fmt } from "../dsp/format";
 
 interface Props {
@@ -10,7 +9,7 @@ interface Props {
   clipRange?: [number, number] | null;
 }
 
-function ModelCard({
+function ModelOption({
   variant,
   selected,
   downloadState,
@@ -26,37 +25,24 @@ function ModelCard({
 
   return (
     <button
-      className={`model-card ${selected ? "model-card--selected" : ""} ${cached && !selected ? "model-card--cached" : ""}`}
+      className={`model-option ${selected ? "model-option--selected" : ""}`}
       onClick={onClick}
+      title={variant.description}
     >
-      <div className="model-card__inner">
-        <span className="model-card__label">{variant.label}</span>
-        <span className="model-card__desc">{variant.description}</span>
-        <span className="model-card__size">{variant.sizeMb} MB</span>
-
-        <div className="model-card__status">
-          {downloadState.status === "checking" && (
-            <span className="model-card__hint">Checking...</span>
-          )}
-          {downloadState.status === "not-downloaded" && (
-            <span className="model-card__hint">Click to download</span>
-          )}
-          {downloading && (
-            <ProgressBar progress={(downloadState as Extract<DownloadState, { status: "downloading" }>).progress} />
-          )}
-          {cached && (
-            <span className="model-card__cached">
-              <svg className="model-card__check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 6L9 17l-5-5" />
-              </svg>
-              Ready
-            </span>
-          )}
-          {downloadState.status === "error" && (
-            <span className="model-card__error">{downloadState.message}</span>
-          )}
-        </div>
-      </div>
+      <span className="model-option__label">{variant.label}</span>
+      <span
+        className={`model-option__meta ${cached ? "model-option__meta--ready" : ""} ${downloadState.status === "error" ? "model-option__meta--error" : ""}`}
+      >
+        {downloadState.status === "checking" && "…"}
+        {downloadState.status === "not-downloaded" && `${variant.sizeMb} MB`}
+        {downloading &&
+          (() => {
+            const progress = (downloadState as Extract<DownloadState, { status: "downloading" }>).progress;
+            return progress !== null ? `${Math.round(progress * 100)}%` : "…";
+          })()}
+        {cached && "✓"}
+        {downloadState.status === "error" && "⚠"}
+      </span>
     </button>
   );
 }
@@ -143,7 +129,7 @@ export function ModelSidebar({ onRun, disabled = false, clipRange = null }: Prop
 
       <div className="model-sidebar__cards">
         {models.map((variant, i) => (
-          <ModelCard
+          <ModelOption
             key={variant.id}
             variant={variant}
             selected={selectedId === variant.id}
