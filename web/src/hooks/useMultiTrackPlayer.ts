@@ -34,7 +34,7 @@ export interface MultiTrackPlayer {
   currentTime: number;
   duration: number;
   muted: Record<string, boolean>;
-  solo: string | null;
+  solo: Set<string>; // cumulative — several stems can be soloed together
   levels: Record<string, number>; // 0..1.5, continuous blend per stem
   vocalReduction: number; // 0..1 — master-bus phase-cancellation vocal reduction
   bandGains: BandGains; // master-bus 3-band kill EQ, in dB
@@ -43,6 +43,7 @@ export interface MultiTrackPlayer {
   stretchMode: StretchMode; // which of the two is currently driving playback
   styles: Record<string, StyleId>; // per-stem genre-style DSP preset
   masterStyle: StyleId; // whole-mix genre-style DSP preset, on the master bus
+  loop: boolean; // whole-track looping
   toggleAll: () => void;
   playSolo: (name: string) => void;
   toggleMute: (name: string) => void;
@@ -53,6 +54,7 @@ export interface MultiTrackPlayer {
   setTimeStretch: (rate: number) => void;
   setStyle: (name: string, style: StyleId) => void;
   setMasterStyle: (style: StyleId) => void;
+  toggleLoop: () => void;
   seek: (time: number) => void;
 }
 
@@ -65,10 +67,10 @@ export function computeStemGain(
   name: string,
   levels: Record<string, number>,
   muted: Record<string, boolean>,
-  solo: string | null,
+  solo: Set<string>,
 ): number {
   const level = levels[name] ?? 1;
-  const audible = solo !== null ? name === solo : !(muted[name] ?? false);
+  const audible = solo.size > 0 ? solo.has(name) : !(muted[name] ?? false);
   return audible ? level : 0;
 }
 
@@ -141,12 +143,13 @@ export function useMultiTrackPlayer(
   const playingRef = useRef(false);
   const rateRef = useRef(1);
   const modeRef = useRef<StretchMode>("tempo");
+  const loopRef = useRef(false);
 
   const rafRef = useRef(0);
 
   // Mute/solo/level refs (source of truth)
   const mutedRef = useRef<Record<string, boolean>>({});
-  const soloRef = useRef<string | null>(null);
+  const soloRef = useRef<Set<string>>(new Set());
   const levelsRef = useRef<Record<string, number>>({});
 
   // React state for rendering
@@ -154,7 +157,7 @@ export function useMultiTrackPlayer(
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState<Record<string, boolean>>({});
-  const [solo, setSolo] = useState<string | null>(null);
+  const [solo, setSolo] = useState<Set<string>>(new Set());
   const [levels, setLevels] = useState<Record<string, number>>({});
   const [vocalReduction, setVocalReductionState] = useState(0);
   const [bandGains, setBandGainsState] = useState<BandGains>(DEFAULT_BAND_GAINS);
@@ -163,6 +166,7 @@ export function useMultiTrackPlayer(
   const [stretchMode, setStretchModeState] = useState<StretchMode>("tempo");
   const [styles, setStyles] = useState<Record<string, StyleId>>({});
   const [masterStyle, setMasterStyleState] = useState<StyleId>("none");
+  const [loop, setLoopState] = useState(false);
 
   /** Build the shared master FX chain once. Safe to call multiple times. */
   const ensureMasterChain = useCallback((ctx: AudioContext) => {
@@ -322,7 +326,10 @@ export function useMultiTrackPlayer(
       const firstSource = sourcesRef.current.values().next().value;
       if (firstSource) {
         firstSource.onended = () => {
-          if (playingRef.current) {
+          if (!playingRef.current) return;
+          if (loopRef.current) {
+            startSources(0);
+          } else {
             playingRef.current = false;
             offsetRef.current = 0;
             setIsPlaying(false);
@@ -355,14 +362,14 @@ export function useMultiTrackPlayer(
     rateRef.current = 1;
     modeRef.current = "tempo";
     mutedRef.current = {};
-    soloRef.current = null;
+    soloRef.current = new Set();
     levelsRef.current = {};
 
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
     setMuted({});
-    setSolo(null);
+    setSolo(new Set());
     setLevels({});
     setTempoState(1);
     setTimeStretchState(1);
@@ -483,11 +490,14 @@ export function useMultiTrackPlayer(
       if (!ctx) return;
       if (ctx.state === "suspended") ctx.resume();
 
-      const newSolo = soloRef.current === name ? null : name;
-      soloRef.current = newSolo;
-      setSolo(newSolo);
+      const next = new Set(soloRef.current);
+      const nowSoloed = !next.has(name);
+      if (nowSoloed) next.add(name);
+      else next.delete(name);
+      soloRef.current = next;
+      setSolo(next);
 
-      if (newSolo) {
+      if (nowSoloed) {
         mutedRef.current = { ...mutedRef.current, [name]: false };
         setMuted({ ...mutedRef.current });
       }
@@ -509,9 +519,11 @@ export function useMultiTrackPlayer(
       mutedRef.current = { ...mutedRef.current, [name]: !wasMuted };
       setMuted({ ...mutedRef.current });
 
-      if (!wasMuted && soloRef.current === name) {
-        soloRef.current = null;
-        setSolo(null);
+      if (!wasMuted && soloRef.current.has(name)) {
+        const next = new Set(soloRef.current);
+        next.delete(name);
+        soloRef.current = next;
+        setSolo(next);
       }
 
       syncGains();
@@ -623,8 +635,13 @@ export function useMultiTrackPlayer(
     [applyStretch],
   );
 
-  const seek = useCallback(
-    (time: number) => {
+  /** Toggles whole-track looping. Takes effect on the next natural end-of-track. */
+  const toggleLoop = useCallback(() => {
+    loopRef.current = !loopRef.current;
+    setLoopState(loopRef.current);
+  }, []);
+
+  const seek = useCallback(    (time: number) => {
       if (playingRef.current) {
         startSources(time);
         syncGains();
@@ -650,6 +667,7 @@ export function useMultiTrackPlayer(
     stretchMode,
     styles,
     masterStyle,
+    loop,
     toggleAll,
     playSolo,
     toggleMute,
@@ -660,6 +678,7 @@ export function useMultiTrackPlayer(
     setTimeStretch,
     setStyle,
     setMasterStyle,
+    toggleLoop,
     seek,
   };
 }

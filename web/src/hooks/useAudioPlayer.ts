@@ -4,9 +4,11 @@ export interface AudioPlayer {
   isPlaying: boolean;
   currentTime: number;
   duration: number;
+  loop: boolean;
   play: () => void;
   pause: () => void;
   toggle: () => void;
+  toggleLoop: () => void;
   seek: (time: number) => void;
 }
 
@@ -17,9 +19,11 @@ export interface AudioPlayer {
 export function useAudioPlayer(audioUrl: string | null): AudioPlayer {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const rafRef = useRef(0);
+  const loopRef = useRef(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [loop, setLoopState] = useState(false);
 
   // Create / tear-down the audio element when the URL changes
   useEffect(() => {
@@ -32,6 +36,7 @@ export function useAudioPlayer(audioUrl: string | null): AudioPlayer {
     }
 
     const audio = new Audio(audioUrl);
+    audio.loop = loopRef.current;
     audioRef.current = audio;
 
     const onMeta = () => setDuration(audio.duration);
@@ -88,5 +93,12 @@ export function useAudioPlayer(audioUrl: string | null): AudioPlayer {
     }
   }, []);
 
-  return { isPlaying, currentTime, duration, play, pause, toggle, seek };
+  const toggleLoop = useCallback(() => {
+    const next = !loopRef.current;
+    loopRef.current = next;
+    setLoopState(next);
+    if (audioRef.current) audioRef.current.loop = next;
+  }, []);
+
+  return { isPlaying, currentTime, duration, loop, play, pause, toggle, toggleLoop, seek };
 }
