@@ -364,21 +364,21 @@ export default function App() {
               )}
 
               {phase.kind === "separated" && (
-                <>
-                  <StemResults
-                    stems={phase.stems}
-                    player={multiPlayer}
-                    sampleRate={trackInfo.sampleRate}
-                  />
-                  <DjaiFxPanel player={multiPlayer} />
-                </>
+                <StemResults
+                  stems={phase.stems}
+                  player={multiPlayer}
+                  sampleRate={trackInfo.sampleRate}
+                />
               )}
             </div>
-            <ModelSidebar
-              onRun={handleRun}
-              disabled={phase.kind === "separating"}
-              clipRange={clipRange}
-            />
+            <div className="right-column">
+              <ModelSidebar
+                onRun={handleRun}
+                disabled={phase.kind === "separating"}
+                clipRange={clipRange}
+              />
+              {phase.kind === "separated" && <DjaiFxPanel player={multiPlayer} />}
+            </div>
           </>
         )}
       </main>

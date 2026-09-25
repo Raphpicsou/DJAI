@@ -414,7 +414,7 @@ body {
 .spectrogram-wrap {
   position: relative;
   flex: none;
-  height: 260px;
+  height: 140px;
   border-radius: 14px;
   overflow: hidden;
   background: #000;
@@ -543,12 +543,18 @@ body {
    Model Sidebar
    ══════════════════════════════════════════════════════════════ */
 .model-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: player-in 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.right-column {
   width: 300px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  animation: player-in 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .model-sidebar__heading {
@@ -1137,7 +1143,6 @@ body {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
-  margin-top: 12px;
 }
 
 .djai-fx__section {
